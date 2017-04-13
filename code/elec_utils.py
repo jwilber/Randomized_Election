@@ -6,12 +6,15 @@ import shapely
 import networkx as nx
 import pysal as ps
 import random
+from matplotlib.colors import ListedColormap
 
 import geopandas as gp
+
 
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Polygon
 
+cm_bright = ListedColormap(['#0099ff', 'red'])
 
 def plot_counties(polyg):
     """Plot county vote distribution"""
@@ -161,6 +164,48 @@ def plot_multiple_new_states(polyg, k=4, fig_size = (20, 17)):
                 # plot states
                 ax.set_title("Republican vs Democrat Victory", fontsize=20, fontweight="bold")
                 ax.axis('off')
-            new_states.plot(ax=ax, column='win', cmap="RdBu_r", linewidth=.2, legend=True)
+            new_states.plot(ax=ax, column='win', cmap=cm_bright, linewidth=.2, legend=True)
         plt.tight_layout()
     plt.show()
+
+
+
+
+
+def get_max_idx(L):
+    """Finds max element of L"""
+    max_i = 0
+    for i in range(len(L)):
+        if L[i] >= L[max_i]:
+            max_i = i
+    return max_i
+
+def remove_i(L, i):
+    """Removes item i from L"""
+    return L[:i] + L[i+1:]
+
+def insert_i(L, i, x):
+    """Inserts item x into position i of L"""
+    return L[:i] + [x] + L[i:]
+
+def apportion(pops, states, seats_to_assign=435, initial=1, extras=2, exclude='DC'):
+    pops = list(pops)
+    states = list(states)
+    assigned = [initial] * len(pops)
+    ex = states.index(exclude)
+    assigned = remove_i(assigned, ex)
+    pops = remove_i(pops, ex)
+    remaining = seats_to_assign - sum(assigned)
+    while remaining > 0:
+        priorities = [p / np.sqrt(a * (a + 1)) for p, a in zip(pops, assigned)]
+        max_priority = get_max_idx(priorities)
+        assigned[max_priority] += 1
+        remaining -= 1
+    assigned = insert_i(assigned, ex, 1)
+    assigned = [__ + 2 for __ in assigned]
+    return assigned
+
+def run_election(df, st='state', pop='population', ev='ev'):
+    states = make_states(election, st)
+    states[ev] = apportion(states[pop], states[st])
+    return {'gop': sum(states.ev[states.win == 'R']), 'dem': sum(states.ev[states.win == 'D'])}
